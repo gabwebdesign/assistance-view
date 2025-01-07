@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 export default function Home() {
 
   const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+  const apiURL = process.env.NEXT_PUBLIC_API_URL;
   
   const [inputData, setInputData] = useState('');
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
@@ -40,7 +41,7 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const res = await axios.post(`/api/generate-itinerary`, {
+      const res = await axios.post(`${apiURL}/api/generate-itinerary`, {
         respuesta: inputData
       },{
         headers: {
@@ -71,7 +72,7 @@ export default function Home() {
 
   const sendFeedback = async () => {
     try {
-      const res = await axios.post(`/api/feedback-itinerary`, {
+      const res = await axios.post(`${apiURL}/api/feedback-itinerary`, {
         feedback: inputData
       }, {
         headers: {
