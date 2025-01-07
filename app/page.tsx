@@ -1,101 +1,200 @@
+"use client";
+import axios from "axios";
 import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+  
+  const [inputData, setInputData] = useState('');
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const [inputEnabled, setInputEnabled] = useState(false);
+  const [btnVisible, setBtnVisible] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [flowFinished, setFlowFinished] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [itineraryCorrected, setItineraryCorrected] = useState(false);
+
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      if(!flowFinished){
+        initFlow() 
+      }else{
+        sendFeedback();
+      }
+    }
+  };
+
+  /*const resetDataUser = async () => {
+    try{
+      const res = await axios.get('http://localhost:5001/api/reset');
+      return res;
+    }catch(error){
+      console.error('Error al resetear la conversacion:', error)
+    }
+  }*/
+
+  const initFlow = async () => {
+    setLoading(true);
+
+    try {
+      const res = await axios.post(`/api/generate-itinerary`, {
+        respuesta: inputData
+      },{
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': `${apiKey}`
+        }
+      });
+
+      const userMessage = { role: "user", content: inputData };
+      const assistanceResponse = res.data.pregunta ?? res.data.response;
+      const systemMessage = { role: "system", content: assistanceResponse };
+      
+      if(assistanceResponse.includes('¡Aquí está tu itinerario!')){
+        setFlowFinished(true);
+      };
+      // Actualiza el estado de messages usando la función de actualización
+      setMessages(prevMessages => [...prevMessages, userMessage, systemMessage]);
+      console.log('messages:', messages);
+
+      setInputData('');
+      setLoading(false);
+      
+      //return res.data.pregunta;
+    } catch (error) { 
+      console.error('Error al obtener la conversacion:', error)
+    }
+  }
+
+  const sendFeedback = async () => {
+    try {
+      const res = await axios.post(`/api/feedback-itinerary`, {
+        feedback: inputData
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': `${apiKey}`
+        }
+      });
+      console.log('nuevo itinerario:', res.data.response);
+
+      updateMessages(res.data.response, inputData);
+      setItineraryCorrected(true);
+    } catch (error) {
+      console.error('Error al obtener el itinerario corregido:', error);
+    }
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const updateMessages = (messageFormAI: string, inputDataUser:string) => {
+    // Actualiza el estado de messages usando la función de actualización
+    const userMessage = { role: "user", content: inputDataUser };
+    const systemMessage = { role: "system", content: messageFormAI };
+    setMessages(prevMessages => [...prevMessages, userMessage, systemMessage]);
+  }
+
+  return (
+    <div className="wrapper">
+      <div className="">
+          <div className="p-2 gap-2">
+            <div className="flex justify-center">
+              <Image src="/assistant-trip.png" className="pt-5 pb-5 w-auto h-auto" width={80} height={40} alt="assistant trip image" />
+            </div>
+            {
+              btnVisible && 
+              <div className="bg-gray ballon">
+                <h1 className="pb-3 h1">Hola ¿Deseas viajar a Costa Rica, pero no sabes qué hacer? Soy un asesor de viajes y puedo ayudarte con tu itinerario acorde a tus necesidades.</h1>
+              </div>
+            }
+            
+          </div>
+          <div className="chat p-2">
+
+              <div className="mb-3">
+                  <ul>
+                    {messages.map((message, index) => (
+                      <li key={index} className="box-assistance mb-3">
+                        {
+                          message.content && 
+                          <div ref={messagesEndRef} className={message.role === "system" ? "bg-turquoise p-4 box whitespace-break-spaces" : "bg-gray p-4 box whitespace-break-spaces"}>
+                          {message.content}
+                          </div>
+                        }
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {!itineraryCorrected &&  
+                                  <div className="w-full p-4 ballon bg-gray flex flex-column md:flex-row justify-between">
+                                  {
+                                    inputEnabled && 
+                                    <div className="w-full">
+                                        <textarea
+                                          className="w-full p-4 h-20 bg-transparent resize-none"
+                                          placeholder={ !flowFinished ? "Tu respuesta aquí..." : "Deseas modificar algo?"}
+                                          autoFocus
+                                          value={inputData}
+                                          onChange={(e) => setInputData(e.target.value)}
+                                          onKeyUp={handleKeyPress}
+                                      />
+                                    </div>
+                                    
+                                  }
+                                  
+                                  <div className="flex justify-between">
+                                        {/* <button  className="p-4">
+                                          <FontAwesomeIcon icon={faUpload} />
+                                        </button> 
+                                      <button onClick={handleAsk} className="rounded-lg p-4 bg-blue-500">
+                                          Pregúntame algo
+                                      </button>*/}
+                                        {
+                                          btnVisible && 
+                                          <button 
+                                          onClick={()=>{
+                                            setBtnVisible(false);
+                                            setInputEnabled(true);
+                                            //resetDataUser();
+                                            initFlow();
+                                          }}
+                                          className="btn">
+                                          Iniciar Itinerario
+                                          </button>
+                                        }
+                                        { 
+                                            !btnVisible && !flowFinished &&
+                                            <button  
+                                            onClick={initFlow} 
+                                            className="btn"
+                                            disabled={inputData.trim() === '' || loading}>
+                                              {
+                                                loading ? 'Generando Itinerario...' : 'Siguiente'
+                                              }
+                                            </button>
+                                        }
+                                        {
+                                            flowFinished &&
+                                            <button
+                                              onClick={()=>{sendFeedback()}}
+                                              className="btn">
+                                            Modificar algo
+                                          </button>
+                                        }
+                                  </div>
+                                </div>
+                }
+            </div>
+          </div>
     </div>
   );
 }
